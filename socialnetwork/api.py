@@ -129,6 +129,44 @@ def submit_post(
 
     #########################
     # add your code here
+    
+        
+    ##preventing posting with negative fame in expertise areas
+    for expertise_area in _expertise_areas:
+        user_fame_entries = Fame.objects.filter(
+        user=user,
+        expertise_area=expertise_area['expertise_area'],
+        fame_level__numeric_value__lt=0)
+        
+        if user_fame_entries.exists():
+            post.published = False
+            break
+        
+    ##adjust fame for negative truth ratings
+    for expertise_area in _expertise_areas:
+        truth_rating = expertise_area['truth_rating']
+        if truth_rating and truth_rating.numeric_value < 0:  
+            area = expertise_area['expertise_area']
+            existing_fame = Fame.objects.filter(user=user, expertise_area=area).first()
+            
+            if existing_fame:
+                #lower existing fame level
+                try:
+                    existing_fame.fame_level = existing_fame.fame_level.get_next_lower_fame_level()
+                    existing_fame.save()
+                except ValueError:
+                    # ban user if can't lower further
+                    user.is_active = False
+                    user.save()
+                    user_posts = Posts.objects.filter(author=user)
+                    post.published = False
+                    user_posts.update(published=False)  
+                    redirect_to_logout = True                 
+            else:
+                # add confuser level for new area
+                confuser_level = FameLevels.objects.get(name="Confuser")
+                Fame.objects.create(user=user, expertise_area=area, fame_level=confuser_level)
+  
     #########################
 
     post.save()
