@@ -2,7 +2,8 @@ from django.db.models import Q, Exists, OuterRef, When, IntegerField, FloatField
 
 from fame.models import Fame, FameLevels, FameUsers, ExpertiseAreas
 from socialnetwork.models import Posts, SocialNetworkUsers
-
+from collections import defaultdict
+from fame.models import Fame
 
 # general methods independent of html and REST views
 # should be used by REST and html views
@@ -220,16 +221,27 @@ def fame(user: SocialNetworkUsers):
 
 
 def bullshitters():
-    """Return a Python dictionary mapping each existing expertise area in the fame profiles to a list of the users
-    having negative fame for that expertise area. Each list should contain Python dictionaries as entries with keys
-    ``user'' (for the user) and ``fame_level_numeric'' (for the corresponding fame value), and should be ranked, i.e.,
-    users with the lowest fame are shown first, in case there is a tie, within that tie sort by date_joined
-    (most recent first). Note that expertise areas with no expert may be omitted.
-    """
-    pass
-    #########################
-    # add your code here
-    #########################
+    #negative Fame Einträge
+    entries = Fame.objects.filter(fame_level__numeric_value__lt=0)
+
+    #pro Fachgebiet sammeln
+    result = defaultdict(list)
+    for entry in entries:
+        ea = entry.expertise_area  # <— Objekt, kein String
+        result[ea].append({
+            "user": entry.user,
+            "fame_level_numeric": entry.fame_level.numeric_value,
+            "date_joined": entry.user.date_joined,
+        })
+
+    #schlechtester Fame zuerst, bei Gleichstand jüngstes Konto
+    for area, user_list in result.items():
+        user_list.sort(key=lambda x: (x["fame_level_numeric"], -x["date_joined"].timestamp()))
+        for d in user_list:
+            d.pop("date_joined", None)
+
+    return dict(result)
+
 
 
 
