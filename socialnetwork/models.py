@@ -1,5 +1,6 @@
 import random as rnd
 
+from django.conf import settings   
 from django.contrib.auth.models import AbstractUser
 from django.db import models
 
@@ -16,9 +17,12 @@ class SocialNetworkUsers(FameUsers):
         "self", symmetrical=False, related_name="followed_by"
     )
     is_banned = models.BooleanField(default=False)
-    # T4
-    # use this member field to adapt the data model, DO NOT RENAME!
-    communities = None
+    communities = models.ManyToManyField(
+        "fame.ExpertiseAreas",   # app_label.ModelName  ← this must match reality
+        symmetrical=False,
+        related_name="members",  # keep or rename as you like
+        blank=True,
+        )
 
     def __str__(self):
         return f"{self.first_name} {self.last_name} ({self.email})"

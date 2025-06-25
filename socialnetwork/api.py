@@ -17,33 +17,53 @@ def _get_social_network_user(user) -> SocialNetworkUsers:
         raise PermissionError("User does not exist")
     return user
 
+from django.db.models import Q
 
-def timeline(user: SocialNetworkUsers, start: int = 0, end: int = None, published=True, community_mode=False):
-    """Get the timeline of the user. Assumes that the user is authenticated."""
+def timeline(user: SocialNetworkUsers,
+             start: int = 0,
+             end: int | None = None,
+             published: bool = True,
+             community_mode: bool = False):
 
     if community_mode:
-        # T4
-        # in community mode, posts of communities are displayed if ALL of the following criteria are met:
-        # 1. the author of the post is a member of the community
-        # 2. the user is a member of the community
-        # 3. the post contains the community’s expertise area
-        # 4. the post is published or the user is the author
+        # ------- prepare ----------------------------------------------------
+        user_communities = set(user.communities.all().values_list("pk", flat=True))
 
-        pass
-        #########################
-        # add your code here
-        #########################
+        # candidate posts: published OR my own drafts
+        candidates = (
+            Posts.objects
+                 .filter(Q(published=published) | Q(author=user))
+                 .select_related("author")                                 # -> no extra query for author
+                 .prefetch_related("expertise_area_and_truth_ratings",      # -> bring M2M rows in bulk
+                                   "author__communities")
+                 .order_by("-submitted")
+        )
+
+        # ------- python-side filter (keeps logic crystal-clear) ------------
+        valid_post_ids = []
+        for post in candidates:
+            post_area_ids   = {ea.pk for ea in post.expertise_area_and_truth_ratings.all()}
+            author_area_ids = {ea.pk for ea in post.author.communities.all()}
+
+            # intersection of all three sets?
+            if post_area_ids & user_communities & author_area_ids:
+                valid_post_ids.append(post.pk)
+
+        posts = Posts.objects.filter(pk__in=valid_post_ids).order_by("-submitted")
 
     else:
-        # in standard mode, posts of followed users are displayed
+        # -------- standard mode (unchanged) --------------------------------
         _follows = user.follows.all()
-        posts = Posts.objects.filter(
-            (Q(author__in=_follows) & Q(published=published)) | Q(author=user)
-        ).order_by("-submitted")
+        posts = (
+            Posts.objects
+                 .filter((Q(author__in=_follows) & Q(published=published)) | Q(author=user))
+                 .order_by("-submitted")
+        )
+
+    # --------------- slicing ----------------------------------------------
     if end is None:
         return posts[start:]
-    else:
-        return posts[start:end+1]
+    return posts[start:end + 1]
 
 
 def search(keyword: str, start: int = 0, end: int = None, published=True):
@@ -155,6 +175,11 @@ def submit_post(
                 try:
                     existing_fame.fame_level = existing_fame.fame_level.get_next_lower_fame_level()
                     existing_fame.save()
+                    # ─── AUTO–KICK WHEN FAME DROPS BELOW SUPER PRO ───
+                    communities_rel = getattr(user, "communities", None)
+                    if communities_rel and hasattr(communities_rel, "remove"):
+                        communities_rel.remove(area)
+
                 except ValueError:
                     # ban user if can't lower further
                     user.is_active = False
@@ -242,28 +267,27 @@ def bullshitters():
 
     return dict(result)
 
-
-
-
-
-
-def join_community(user: SocialNetworkUsers, community: ExpertiseAreas):
-    """Join a specified community. Note that this method does not check whether the user is eligible for joining the
-    community.
+def join_community(user: SocialNetworkUsers, community: ExpertiseAreas) -> None:
     """
-    pass
-    #########################
-    # add your code here
-    #########################
+    Add *user* to *community*.
+    Idempotent: does nothing if the user is already a member.
+    """
+    if community is None:
+        raise ValueError("community must not be None")
+    user.communities.add(community)      # safe even if already there
+
+
+def leave_community(user: SocialNetworkUsers, community: ExpertiseAreas) -> None:
+    """
+    Remove *user* from *community*.
+    Idempotent: does nothing if the user is not a member.
+    """
+    if community is None:
+        raise ValueError("community must not be None")
+    user.communities.remove(community)
 
 
 
-def leave_community(user: SocialNetworkUsers, community: ExpertiseAreas):
-    """Leave a specified community."""
-    pass
-    #########################
-    # add your code here
-    #########################
 
 
 
