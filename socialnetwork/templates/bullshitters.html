@@ -1,0 +1,22 @@
+{% extends "base.html" %}
+{% block title %}Bullshitters{% endblock %}
+
+{% block body %}
+    <br>
+    <h2>Bullshitters</h2>
+    <br>
+    {% for expertise_area, users in bullshitters_data.items %}
+        <div class="card" style="margin-bottom: 20px; margin-left: 40px; margin-right: 40px;">
+            <div class="card-header">
+                <h3>{{ expertise_area.label }}</h3>
+            </div>
+            <ul class="list-group list-group-flush">
+                {% for user_data in users %}
+                    <li class="list-group-item">
+                        <a href="/fame/html/fame?userid={{ user_data.user.id }}">{{ user_data.user.first_name }} {{ user_data.user.last_name }}</a>: {{ user_data.fame_level_numeric }}
+                    </li>
+                {% endfor %}
+            </ul>
+        </div>
+    {% endfor %}
+{% endblock %}

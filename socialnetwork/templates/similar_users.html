@@ -1,0 +1,24 @@
+{% extends "base.html" %}
+
+{% block title %}Similar Users{% endblock %}
+
+{% block body %}
+    <br>
+    <div class="container">
+        <h2>Users with Similar Fame Profiles</h2>
+        <p class="text-muted">Showing users with similar fame levels in your areas of expertise.</p>
+        <br>
+        <div class="card">
+            <ul class="list-group list-group-flush">
+                {% for user in similar_users_list %}
+                    <li class="list-group-item">
+                        <a href="/fame/html/fame?userid={{ user.id }}">{{ user.first_name }} {{ user.last_name }}</a>
+                        <small class="text-muted">(@{{ user.username }})</small>
+                    </li>
+                {% empty %}
+                    <li class="list-group-item">No similar users found.</li>
+                {% endfor %}
+            </ul>
+        </div>
+    </div>
+{% endblock %}
